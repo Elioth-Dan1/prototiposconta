@@ -1,33 +1,47 @@
+import 'package:app_flutter/ui/pages/home_page.dart';
+import 'package:app_flutter/ui/pages/register_page.dart';
 import 'package:app_flutter/ui/pages/remember_password.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:app_flutter/ui/pages/register_page.dart';
+import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:social_login_buttons/social_login_buttons.dart';
 
 class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
   @override
-  State<StatefulWidget> createState() {
-    return LoginPageState();
-  }
+  State<LoginPage> createState() => _LoginPageState();
 }
 
-class LoginPageState extends State<LoginPage> {
+class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
   Future<void> _loginWithEmail() async {
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-      ScaffoldMessenger.of(
+
+      final doc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(credential.user!.uid)
+          .get();
+
+      final rol = doc.data()?['rol'] ?? 'usuario';
+      final suscripcion = doc.data()?['suscripcion'] ?? 'basico';
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
         context,
-      ).showSnackBar(const SnackBar(content: Text("Inicio de sesión exitoso")));
-      // TODO: Redirige a la página principal aquí
+        MaterialPageRoute(
+          builder: (context) => HomePage(role: rol, suscripcion: suscripcion),
+        ),
+      );
     } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text("Error: ${e.message}")));
@@ -65,13 +79,29 @@ class LoginPageState extends State<LoginPage> {
         'apellidoPaterno': '',
         'apellidoMaterno': '',
         'fechaNacimiento': '',
+        'rol': 'usuario',
+        'suscripcion': 'basico',
         'createdAt': FieldValue.serverTimestamp(),
       });
+    } else {
+      final data = snapshot.data();
+      if (data == null || !data.containsKey('rol')) {
+        await docRef.update({'rol': 'usuario'});
+      }
+      if (data == null || !data.containsKey('suscripcion')) {
+        await docRef.update({'suscripcion': 'basico'});
+      }
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Inicio de sesión con Google y datos guardados"),
+    final updatedDoc = await docRef.get();
+    final rol = updatedDoc.data()?['rol'] ?? 'usuario';
+    final suscripcion = updatedDoc.data()?['suscripcion'] ?? 'basico';
+
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => HomePage(role: rol, suscripcion: suscripcion),
       ),
     );
   }
@@ -88,7 +118,7 @@ class LoginPageState extends State<LoginPage> {
             Image.asset("assets/login.jpg", width: 150, height: 150),
             const SizedBox(height: 16),
             const Text(
-              "Bienvenido a mi aplicacion",
+              "Bienvenido a mi aplicación",
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 24),
@@ -112,7 +142,7 @@ class LoginPageState extends State<LoginPage> {
             const SizedBox(height: 10),
             GestureDetector(
               child: Text(
-                "Olvide mi contraseña",
+                "Olvidé mi contraseña",
                 style: TextStyle(
                   color: Colors.blue[700],
                   decoration: TextDecoration.underline,
@@ -152,7 +182,7 @@ class LoginPageState extends State<LoginPage> {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => RegisterPage()),
+                  MaterialPageRoute(builder: (context) => const RegisterPage()),
                 );
               },
             ),
