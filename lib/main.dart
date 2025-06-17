@@ -100,7 +100,7 @@ class AuthGate extends StatelessWidget {
         if (snapshot.hasData) {
           final uid = snapshot.data!.uid;
           return FutureBuilder<Map<String, String>>(
-            future: _fetchUserData(uid),
+            future: _fetchUserDataWithDelay(uid),
             builder: (context, userSnapshot) {
               if (userSnapshot.connectionState == ConnectionState.waiting) {
                 return const Scaffold(
@@ -116,7 +116,11 @@ class AuthGate extends StatelessWidget {
               }
 
               return const Scaffold(
-                body: Center(child: Text('No se encontró usuario')),
+                body: Center(
+                  child: Text(
+                    'No se encontró usuario, por favor intenta más tarde.',
+                  ),
+                ),
               );
             },
           );
@@ -125,6 +129,23 @@ class AuthGate extends StatelessWidget {
         }
       },
     );
+  }
+
+  Future<Map<String, String>> _fetchUserDataWithDelay(String uid) async {
+    await Future.delayed(const Duration(seconds: 1));
+
+    final res = await Supabase.instance.client
+        .from('usuarios')
+        .select()
+        .eq('id', uid)
+        .maybeSingle();
+
+    if (res == null) throw Exception("Usuario no encontrado en Supabase");
+
+    return {
+      'role': res['rol'] as String? ?? 'usuario',
+      'suscripcion': res['suscripcion'] as String? ?? 'basico',
+    };
   }
 
   Future<Map<String, String>> _fetchUserData(String uid) async {

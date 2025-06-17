@@ -1,30 +1,48 @@
-// admin_event_page.dart
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'add_event_form.dart';
 import 'edit_event_form.dart';
 
-class AdminEventPage extends StatelessWidget {
+class AdminEventPage extends StatefulWidget {
   const AdminEventPage({super.key});
+
+  @override
+  State<AdminEventPage> createState() => _AdminEventPageState();
+}
+
+class _AdminEventPageState extends State<AdminEventPage> {
+  Future<List<Map<String, dynamic>>> _fetchEventos() async {
+    final response = await Supabase.instance.client
+        .from('eventos')
+        .select('*, usuarios(nombres)')
+        .order('created_at', ascending: false);
+
+    return List<Map<String, dynamic>>.from(response);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Gestión de eventos')),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('eventos').snapshots(),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _fetchEventos(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          final docs = snapshot.data?.docs ?? [];
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(child: Text('No hay eventos disponibles.'));
+          }
+
+          final eventos = snapshot.data!;
 
           return ListView.builder(
-            itemCount: docs.length,
+            itemCount: eventos.length,
             itemBuilder: (context, index) {
-              final evento = docs[index].data() as Map<String, dynamic>;
-              final id = docs[index].id;
+              final evento = eventos[index];
+              final creador = evento['usuarios'];
+              final id = evento['id'];
 
               return Card(
                 margin: const EdgeInsets.all(8),
@@ -40,7 +58,9 @@ class AdminEventPage extends StatelessWidget {
                         )
                       : const Icon(Icons.event),
                   title: Text(evento['titulo'] ?? 'Sin título'),
-                  subtitle: Text(evento['descripcion'] ?? ''),
+                  subtitle: Text(
+                    '${evento['descripcion'] ?? ''}\nCreado por: ${creador != null ? creador['nombres'] : 'Desconocido'}',
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -57,8 +77,7 @@ class AdminEventPage extends StatelessWidget {
                             ),
                             builder: (context) => EditEventForm(
                               eventId: id,
-                              existingData:
-                                  evento, // ← este es el nombre correcto
+                              existingData: evento,
                             ),
                           );
                         },
@@ -66,13 +85,16 @@ class AdminEventPage extends StatelessWidget {
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
                         onPressed: () async {
-                          await FirebaseFirestore.instance
-                              .collection('eventos')
-                              .doc(id)
-                              .delete();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Evento eliminado")),
-                          );
+                          await Supabase.instance.client
+                              .from('eventos')
+                              .delete()
+                              .eq('id', id);
+                          if (mounted) {
+                            setState(() {}); // refresca la lista
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Evento eliminado")),
+                            );
+                          }
                         },
                       ),
                     ],
@@ -90,22 +112,11 @@ class AdminEventPage extends StatelessWidget {
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          builder: (context) => Material(
-            child: Localizations.override(
-              context: context,
-              locale: const Locale('es'), // o 'en' según el idioma que uses
-              child: const Padding(
-                padding: EdgeInsets.only(
-                  left: 16,
-                  right: 16,
-                  top: 16,
-                  bottom: 32,
-                ),
-                child: AddEventForm(),
-              ),
-            ),
+          builder: (context) => const Padding(
+            padding: EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 32),
+            child: AddEventForm(),
           ),
-        ),
+        ).then((_) => setState(() {})),
         child: const Icon(Icons.add),
       ),
     );

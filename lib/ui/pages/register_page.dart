@@ -103,9 +103,17 @@ class _RegisterPageState extends State<RegisterPage> {
       }
 
       if (!mounted) return;
+
+      // Mostrar mensaje
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Registro exitoso')));
+
+      // Esperar 3 segundos antes de redirigir
+      await Future.delayed(const Duration(seconds: 4));
+
+      // Verifica que el widget siga montado antes de navegar
+      if (!mounted) return;
       Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(

@@ -3,6 +3,8 @@
 import 'package:app_flutter/ui/pages/activity_log_page.dart';
 import 'package:app_flutter/ui/pages/admin_panel_page.dart';
 import 'package:app_flutter/ui/pages/days_counter_page.dart';
+import 'package:app_flutter/ui/pages/premium_upgrade_page.dart';
+import 'package:app_flutter/ui/pages/user_profile_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import "package:flutter/material.dart";
 import "package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart";
@@ -35,9 +37,9 @@ class _HomePageState extends State<HomePage> {
     return [
       WelcomeView(role: widget.role),
       const ActivityLogPage(),
-      const Placeholder(),
+      const PremiumOfferScreen(),
       if (isAdmin) const AdminEventPage() else const DaysCounterPage(),
-      const SettingsPage(),
+      const UserProfilePage(),
     ];
   }
 
@@ -278,14 +280,5 @@ class ServiceCard extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: Text("Configuraciones")));
   }
 }
