@@ -1,19 +1,66 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'firebase_options.dart';
 import 'ui/pages/home_page.dart';
 import 'ui/pages/login_page.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
+  await Supabase.initialize(
+    url: 'https://tircyfyfhishzhzrlrup.supabase.co',
+    anonKey:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRpcmN5ZnlmaGlzaHpoenJscnVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAxMTYyMDQsImV4cCI6MjA2NTY5MjIwNH0.TpyfLjDf1DEhX8hZI4e0-6qNfoJEAQ_0rd6BxN5tZAg',
+  );
+
+  final connected = await isSupabaseConnected();
+
+  if (!connected) {
+    runApp(const SupabaseErrorApp());
+    return;
+  }
+
   runApp(const MyApp());
+}
+
+Future<bool> isSupabaseConnected() async {
+  try {
+    final response = await Supabase.instance.client
+        .from('usuarios') // Asegúrate que esta tabla existe
+        .select()
+        .limit(1)
+        .maybeSingle();
+
+    return true;
+  } catch (e) {
+    debugPrint('❌ Error de conexión con Supabase: $e');
+    return false;
+  }
+}
+
+class SupabaseErrorApp extends StatelessWidget {
+  const SupabaseErrorApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: Center(
+          child: Text(
+            '❌ No se pudo conectar a Supabase.\nVerifica tu conexión o configuración.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 18),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -41,8 +88,8 @@ class AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
+    return StreamBuilder<fb_auth.User?>(
+      stream: fb_auth.FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -53,7 +100,7 @@ class AuthGate extends StatelessWidget {
         if (snapshot.hasData) {
           final uid = snapshot.data!.uid;
           return FutureBuilder<Map<String, String>>(
-            future: _getUserRoleAndSuscription(uid),
+            future: _fetchUserData(uid),
             builder: (context, userSnapshot) {
               if (userSnapshot.connectionState == ConnectionState.waiting) {
                 return const Scaffold(
@@ -62,40 +109,34 @@ class AuthGate extends StatelessWidget {
               }
 
               if (userSnapshot.hasData) {
-                final data = userSnapshot.data!;
-                final role = data['role'] ?? 'usuario';
-                final suscripcion = data['suscripcion'] ?? 'basico';
-
-                return HomePage(role: role, suscripcion: suscripcion);
-              } else {
-                return const Scaffold(
-                  body: Center(child: Text('Error al obtener los datos')),
+                return HomePage(
+                  role: userSnapshot.data!['role']!,
+                  suscripcion: userSnapshot.data!['suscripcion']!,
                 );
               }
+
+              return const Scaffold(
+                body: Center(child: Text('No se encontró usuario')),
+              );
             },
           );
         } else {
-          return const LoginPage(); // Asegúrate que LoginPage no sea `const` si usa controladores.
+          return const LoginPage();
         }
       },
     );
   }
 
-  Future<Map<String, String>> _getUserRoleAndSuscription(String uid) async {
-    final doc = await FirebaseFirestore.instance
-        .collection('usuarios')
-        .doc(uid)
-        .get();
+  Future<Map<String, String>> _fetchUserData(String uid) async {
+    final res = await Supabase.instance.client
+        .from('usuarios')
+        .select()
+        .eq('id', uid)
+        .single();
 
-    final data = doc.data();
-
-    if (data != null) {
-      return {
-        'role': data['rol'] ?? 'usuario',
-        'suscripcion': data['suscripcion'] ?? 'basico',
-      };
-    } else {
-      return {'role': 'usuario', 'suscripcion': 'basico'};
-    }
+    return {
+      'role': res['role'] as String? ?? 'usuario',
+      'suscripcion': res['suscripcion'] as String? ?? 'basico',
+    };
   }
 }

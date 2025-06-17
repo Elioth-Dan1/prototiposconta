@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:social_login_buttons/social_login_buttons.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -22,22 +23,53 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
-        password: _passwordController.text,
+        password: _passwordController.text.trim(),
       );
+
+      final userId = credential.user!.uid;
 
       final doc = await FirebaseFirestore.instance
           .collection('usuarios')
-          .doc(credential.user!.uid)
+          .doc(userId)
           .get();
 
-      final rol = doc.data()?['rol'] ?? 'usuario';
-      final suscripcion = doc.data()?['suscripcion'] ?? 'basico';
+      final data = doc.data()!;
+      final rol = data['rol'] ?? 'usuario';
+      final suscripcion = data['suscripcion'] ?? 'basico';
+
+      // Sincronizar en Supabase
+      final existing = await Supabase.instance.client
+          .from('usuarios')
+          .select()
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (existing == null) {
+        final fechaNacStr = data['fechaNacimiento'] ?? '';
+        DateTime? fechaNacimiento;
+        if (fechaNacStr.isNotEmpty) {
+          fechaNacimiento = DateTime.tryParse(fechaNacStr);
+        }
+
+        await Supabase.instance.client.from('usuarios').insert({
+          'id': userId,
+          'nombres': data['nombres'] ?? '',
+          'apellido_paterno': data['apellidoPaterno'] ?? '',
+          'apellido_materno': data['apellidoMaterno'] ?? '',
+          'telefono': data['telefono'],
+          'fecha_nacimiento': fechaNacimiento?.toIso8601String(),
+          'email': credential.user!.email,
+          'rol': rol,
+          'suscripcion': suscripcion,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
 
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => HomePage(role: rol, suscripcion: suscripcion),
+          builder: (_) => HomePage(role: rol, suscripcion: suscripcion),
         ),
       );
     } on FirebaseAuthException catch (e) {
@@ -74,34 +106,56 @@ class _LoginPageState extends State<LoginPage> {
 
     if (!snapshot.exists) {
       await docRef.set({
-        'nombres': user.displayName,
-        'email': user.email,
+        'nombres': user.displayName ?? '',
         'apellidoPaterno': '',
         'apellidoMaterno': '',
-        'fechaNacimiento': '',
+        'telefono': null,
+        'fechaNacimiento': null,
+        'email': user.email,
         'rol': 'usuario',
         'suscripcion': 'basico',
         'createdAt': FieldValue.serverTimestamp(),
       });
-    } else {
-      final data = snapshot.data();
-      if (data == null || !data.containsKey('rol')) {
-        await docRef.update({'rol': 'usuario'});
-      }
-      if (data == null || !data.containsKey('suscripcion')) {
-        await docRef.update({'suscripcion': 'basico'});
-      }
     }
 
     final updatedDoc = await docRef.get();
-    final rol = updatedDoc.data()?['rol'] ?? 'usuario';
-    final suscripcion = updatedDoc.data()?['suscripcion'] ?? 'basico';
+    final data = updatedDoc.data()!;
+    final rol = data['rol'] ?? 'usuario';
+    final suscripcion = data['suscripcion'] ?? 'basico';
+
+    // Supabase
+    final existing = await Supabase.instance.client
+        .from('usuarios')
+        .select()
+        .eq('id', user.uid)
+        .maybeSingle();
+
+    if (existing == null) {
+      final fechaNacStr = data['fechaNacimiento'] ?? '';
+      DateTime? fechaNacimiento;
+      if (fechaNacStr.isNotEmpty) {
+        fechaNacimiento = DateTime.tryParse(fechaNacStr);
+      }
+
+      await Supabase.instance.client.from('usuarios').insert({
+        'id': user.uid,
+        'nombres': data['nombres'] ?? '',
+        'apellido_paterno': data['apellidoPaterno'] ?? '',
+        'apellido_materno': data['apellidoMaterno'] ?? '',
+        'telefono': data['telefono'],
+        'fecha_nacimiento': fechaNacimiento?.toIso8601String(),
+        'email': user.email,
+        'rol': rol,
+        'suscripcion': suscripcion,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    }
 
     if (!mounted) return;
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => HomePage(role: rol, suscripcion: suscripcion),
+        builder: (_) => HomePage(role: rol, suscripcion: suscripcion),
       ),
     );
   }
@@ -151,7 +205,7 @@ class _LoginPageState extends State<LoginPage> {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => RememberPassword()),
+                  MaterialPageRoute(builder: (_) => RememberPassword()),
                 );
               },
             ),
@@ -182,7 +236,7 @@ class _LoginPageState extends State<LoginPage> {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const RegisterPage()),
+                  MaterialPageRoute(builder: (_) => const RegisterPage()),
                 );
               },
             ),
