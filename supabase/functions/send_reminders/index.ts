@@ -1,17 +1,11 @@
-// supabase/functions/send_reminders/index.ts
-// ─────────────────────────────────────────────────────────────
-//  UN SOLO ENDPOINT para:
-//    • Recordatorio de consumo   → kind=consumo  (default)      (20 h)
-//    • Recordatorio de estado    → kind=mood&slot={morning|afternoon|evening}
-// ─────────────────────────────────────────────────────────────
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { encodeBase64, decodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.1";
 
 /* ── ENV & SUPABASE ───────────────────────────────────────── */
 const supabase = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  Deno.env.get("URL")!,
+  Deno.env.get("SERVICE_ROLE_KEY")!,
 );
 
 /* ── Config FCM (service account en B64) ───────────────────── */
