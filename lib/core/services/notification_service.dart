@@ -4,67 +4,105 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 
+import '../../main.dart';                    // ← importa navigatorKey
+import '../../ui/pages/mood_tracker_page.dart';
+import '../../ui/pages/days_counter_page.dart';
+
 class NotificationService {
   static final _local = FlutterLocalNotificationsPlugin();
 
+  /* ─────────────── PUBLIC ─────────────── */
   static Future<void> init() async {
-    // Solicita permisos (importante en iOS, también útil en Android 13+)
+    /* 1. Permisos (iOS / Android 13+) */
     await FirebaseMessaging.instance.requestPermission();
 
-    // Configura canal para Android
+    /* 2. Canal Android */
+    const channel = AndroidNotificationChannel(
+      'reminders',
+      'Recordatorios',
+      description: 'Avisos diarios y de ánimo',
+      importance: Importance.high,
+    );
+    await _local
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+
+    /* 3. Init local plugin */
     const initSettings = InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
     );
     await _local.initialize(initSettings);
 
-    // Obtiene token FCM
-    final token = await FirebaseMessaging.instance.getToken();
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+    /* 4. Guarda token inicial y escucha rotaciones */
+    await _saveToken(await FirebaseMessaging.instance.getToken());
+    FirebaseMessaging.instance.onTokenRefresh.listen(_saveToken);
 
-    // Guarda en Supabase
+    /* 5. Notificación en primer plano */
+    FirebaseMessaging.onMessage.listen(_showForeground);
+
+    /* 6. Deep-link */
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleNavigation);
+    final initial = await FirebaseMessaging.instance.getInitialMessage();
+    if (initial != null) _handleNavigation(initial);
+  }
+
+  static Future<void> clearToken() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    try {
+      await FirebaseMessaging.instance.deleteToken();
+      await Supabase.instance.client
+          .from('usuarios')
+          .update({'fcm_token': null})
+          .eq('id', uid);
+    } catch (e) {
+      debugPrint('Error limpiando token FCM: $e');
+    }
+  }
+
+  /* ─────────────── PRIVADOS ─────────────── */
+  static Future<void> _saveToken(String? token) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     if (token != null && uid != null) {
       await Supabase.instance.client
           .from('usuarios')
           .update({'fcm_token': token})
           .eq('id', uid);
     }
-
-    // Cuando la app está abierta y recibe una notificación
-    FirebaseMessaging.onMessage.listen((msg) {
-      final n = msg.notification;
-      if (n != null) {
-        _local.show(
-          n.hashCode,
-          n.title,
-          n.body,
-          const NotificationDetails(
-            android: AndroidNotificationDetails(
-              'reminders', // ID del canal
-              'Recordatorios',
-              importance: Importance.max,
-              priority: Priority.high,
-            ),
-          ),
-        );
-      }
-    });
   }
 
-    static Future<void> clearToken() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid != null) {
-      try {
-        // 1. Pide a FCM que invalide el token en este dispositivo
-        await FirebaseMessaging.instance.deleteToken();
+  static void _showForeground(RemoteMessage msg) {
+    final n = msg.notification;
+    if (n != null) {
+      _local.show(
+        n.hashCode,
+        n.title,
+        n.body,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'reminders',
+            'Recordatorios',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+        ),
+      );
+    }
+  }
 
-        // 2. Limpia el campo en Supabase (si usas 'fcm_token' en la tabla usuarios)
-        await Supabase.instance.client
-            .from('usuarios')
-            .update({'fcm_token': null})
-            .eq('id', uid);
-      } catch (e) {
-        debugPrint('Error limpiando token FCM: $e');
-      }
+  static void _handleNavigation(RemoteMessage msg) {
+    final route = msg.data['route'];
+    if (navigatorKey.currentState == null) return;
+
+    if (route == 'mood') {
+      navigatorKey.currentState!.push(
+        MaterialPageRoute(builder: (_) => const MoodTrackerPage()),
+      );
+    } else if (route == 'days') {
+      navigatorKey.currentState!.push(
+        MaterialPageRoute(builder: (_) => const DaysCounterPage()),
+      );
     }
   }
 }

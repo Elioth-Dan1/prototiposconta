@@ -46,6 +46,8 @@ Future<bool> isSupabaseConnected() async {
   }
 }
 
+
+
 class SupabaseErrorApp extends StatelessWidget {
   const SupabaseErrorApp({super.key});
 
@@ -66,6 +68,7 @@ class SupabaseErrorApp extends StatelessWidget {
   }
 }
 
+final navigatorKey = GlobalKey<NavigatorState>();
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -81,6 +84,7 @@ class MyApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [Locale('es', 'ES')],
+      navigatorKey: navigatorKey,
       home: const AuthGate(),
 
       routes: {

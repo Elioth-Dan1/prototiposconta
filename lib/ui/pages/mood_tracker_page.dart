@@ -24,7 +24,7 @@ class _MoodTrackerPageState extends State<MoodTrackerPage> {
     {'label': 'Enojado', 'emoji': '😡', 'color': Colors.red},
   ];
 
-  /* ─── Definición de franjas ─── */
+  /* ─── Franjas ─── */
   final _slots = [
     {
       'key': 'morning',
@@ -49,7 +49,6 @@ class _MoodTrackerPageState extends State<MoodTrackerPage> {
     },
   ];
 
-  /* Map<franja, estado> */
   Map<String, String?> _today = {
     'morning': null,
     'afternoon': null,
@@ -62,10 +61,14 @@ class _MoodTrackerPageState extends State<MoodTrackerPage> {
     _loadToday();
   }
 
-  /* ─── Helpers ─── */
-  bool _slotIsAvailable(int hour) =>
-      DateTime.now().isAfter(DateTime(
-          DateTime.now().year, DateTime.now().month, DateTime.now().day, hour));
+  bool _slotIsAvailable(int hour) => DateTime.now().isAfter(
+    DateTime(
+      DateTime.now().year,
+      DateTime.now().month,
+      DateTime.now().day,
+      hour,
+    ),
+  );
 
   Future<void> _loadToday() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -79,12 +82,11 @@ class _MoodTrackerPageState extends State<MoodTrackerPage> {
         .eq('usuario_id', uid)
         .eq('fecha', today);
 
-    final Map<String, String?> map = <String, String?>{
+    final Map<String, String?> map = {
       'morning': null,
       'afternoon': null,
       'evening': null,
     };
-
     for (final r in res) {
       map[r['franja'] as String] = r['estado'] as String?;
     }
@@ -96,35 +98,22 @@ class _MoodTrackerPageState extends State<MoodTrackerPage> {
     if (uid == null) return;
 
     final fecha = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    await supabase.from('estado_animo').upsert(
-      {
-        'usuario_id': uid,
-        'fecha': fecha,
-        'franja': slot,
-        'estado': estado,
-      },
-      onConflict: 'usuario_id,fecha,franja',
-    );
+    await supabase.from('estado_animo').upsert({
+      'usuario_id': uid,
+      'fecha': fecha,
+      'franja': slot,
+      'estado': estado,
+    }, onConflict: 'usuario_id,fecha,franja');
 
     setState(() => _today[slot] = estado);
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Estado guardado: $estado')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Estado guardado: $estado')));
     }
   }
 
-  Future<void> _reset(String slot) async {
-    // Deja la franja en null para volver a elegir
-    setState(() => _today[slot] = null);
-    // También puedes eliminar de BD si prefieres:
-    // final uid = FirebaseAuth.instance.currentUser!.uid;
-    // await supabase.from('estado_animo')
-    //     .delete()
-    //     .eq('usuario_id', uid)
-    //     .eq('fecha', DateFormat('yyyy-MM-dd').format(DateTime.now()))
-    //     .eq('franja', slot);
-  }
+  Future<void> _reset(String slot) async => setState(() => _today[slot] = null);
 
   /* ─── UI ─── */
   @override
@@ -133,60 +122,54 @@ class _MoodTrackerPageState extends State<MoodTrackerPage> {
     final greeting = hour < 12
         ? '¡Buen día!'
         : hour < 18
-            ? '¡Buena tarde!'
-            : '¡Buena noche!';
+        ? '¡Buena tarde!'
+        : '¡Buena noche!';
 
     return Scaffold(
+      backgroundColor: Colors.white, // ⬅️ fondo blanco
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text('Mi estado de ánimo',
-            style: TextStyle(fontWeight: FontWeight.w600)),
+        title: const Text(
+          'Mi estado de ánimo',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color.fromARGB(255, 255, 255, 255), Color.fromARGB(255, 254, 254, 254), Color.fromARGB(255, 255, 255, 255)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, kToolbarHeight + 24, 16, 24),
+        children: [
+          Text(
+            '$greeting\nSelecciona cómo te sientes en cada momento del día.',
+            style: const TextStyle(fontSize: 18, color: Colors.black),
           ),
-        ),
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, kToolbarHeight + 24, 16, 24),
-          children: [
-            Text(
-              '$greeting\nSelecciona cómo te sientes en cada momento del día.',
-              style: const TextStyle(fontSize: 18, color: Color.fromARGB(255, 0, 0, 0)),
-            ),
-            const SizedBox(height: 24),
-            ..._slots.map((slot) {
-              final key = slot['key'] as String;
-              final hour = slot['hour'] as int;
+          const SizedBox(height: 24),
 
-              final estado = _today[key];
-              final disponible = _slotIsAvailable(hour);
+          /* ─── Tarjetas de franja ─── */
+          ..._slots.map((slot) {
+            final key = slot['key'] as String;
+            final hour = slot['hour'] as int;
+            final estado = _today[key];
+            final disponible = _slotIsAvailable(hour);
+            if (!disponible && estado == null) return const SizedBox();
 
-              if (!disponible && estado == null) return const SizedBox();
-
-              return _MoodCard(
-                icon: slot['icon'] as IconData,
-                label: slot['label'] as String,
-                color: slot['color'] as Color,
-                estado: estado,
-                moods: _moods,
-                onSelect: (e) => _save(key, e),
-                onEdit: () => _reset(key),
-              );
-            }).toList(),
-          ],
-        ),
+            return _MoodCard(
+              icon: slot['icon'] as IconData,
+              label: slot['label'] as String,
+              color: slot['color'] as Color,
+              estado: estado,
+              moods: _moods,
+              onSelect: (e) => _save(key, e),
+              onEdit: () => _reset(key),
+            );
+          }).toList(),
+        ],
       ),
     );
   }
 }
 
-/* ─── Card con glassmorphism, chip + botón Editar ─── */
+/* ─── Card ─── */
 class _MoodCard extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -209,23 +192,23 @@ class _MoodCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.only(bottom: 24),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 400),
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.25),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.2),
+              color: Colors.white.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: Colors.white.withOpacity(0.5)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.15),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  color: Colors.black.withOpacity(0.12),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
@@ -236,47 +219,83 @@ class _MoodCard extends StatelessWidget {
                   children: [
                     Icon(icon, color: color, size: 28),
                     const SizedBox(width: 10),
-                    Text(label,
-                        style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: color)),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
                 if (estado == null) ...[
-                  Wrap(
-                    spacing: 10,
-                    children: moods.map((m) {
+                  /* Selector */
+                  GridView.builder(
+                    physics: const NeverScrollableScrollPhysics(),
+                    shrinkWrap: true,
+                    itemCount: moods.length,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 2,
+                        ),
+                    itemBuilder: (_, i) {
+                      final m = moods[i];
                       final emoji = m['emoji']! as String;
-                      final label = m['label']! as String;
+                      final txt = m['label']! as String;
                       return GestureDetector(
-                        onTap: () => onSelect(label),
-                        child:
-                            Text(emoji, style: const TextStyle(fontSize: 32)),
+                        onTap: () => onSelect(txt),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.7),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Colors.black12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(emoji, style: const TextStyle(fontSize: 28)),
+                              const SizedBox(height: 4),
+                              Text(
+                                txt,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       );
-                    }).toList(),
+                    },
                   ),
-                  const SizedBox(height: 6),
-                  const Text('¿Cómo te sientes?',
-                      style: TextStyle(color: Colors.white)),
                 ] else ...[
+                  /* Estado ya guardado */
                   Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: color.withOpacity(0.15),
                           borderRadius: BorderRadius.circular(50),
                         ),
-                        child: Text(estado!,
-                            style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: color)),
+                        child: Text(
+                          estado!,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: color,
+                          ),
+                        ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
                       TextButton.icon(
                         onPressed: onEdit,
                         icon: const Icon(Icons.edit, size: 18),
