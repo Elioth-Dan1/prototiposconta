@@ -2,12 +2,16 @@
 
 import 'package:app_flutter/ui/pages/activity_log_page.dart';
 import 'package:app_flutter/ui/pages/admin_panel_page.dart';
+import 'package:app_flutter/ui/pages/chat_page.dart';
 import 'package:app_flutter/ui/pages/days_counter_page.dart';
+import 'package:app_flutter/ui/pages/event_detail_page.dart';
 import 'package:app_flutter/ui/pages/premium_upgrade_page.dart';
 import 'package:app_flutter/ui/pages/user_profile_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import "package:flutter/material.dart";
+import 'package:intl/intl.dart';
 import "package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart";
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class HomePage extends StatefulWidget {
   final String role;
@@ -35,7 +39,7 @@ class _HomePageState extends State<HomePage> {
     final isAdmin = widget.role == 'admin';
 
     return [
-      WelcomeView(role: widget.role),
+      WelcomeView(role: widget.role, suscripcion: widget.suscripcion),
       const ActivityLogPage(),
       const PremiumOfferScreen(),
       if (isAdmin) const AdminEventPage() else const DaysCounterPage(),
@@ -102,12 +106,89 @@ class _HomePageState extends State<HomePage> {
         ),
       ],
     ),
-    drawer: const Drawer(
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[Text("Este es el menú lateral")],
-        ),
+    drawer: Drawer(
+      child: FutureBuilder<Map<String, dynamic>?>(
+        future: Supabase.instance.client
+            .from('usuarios')
+            .select('suscripcion')
+            .eq('id', FirebaseAuth.instance.currentUser!.uid)
+            .maybeSingle(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final data = snapshot.data;
+          final isPremium = data?['suscripcion'] == 'premium';
+
+          return ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              const DrawerHeader(
+                decoration: BoxDecoration(color: Colors.teal),
+                child: Text(
+                  'Menú Lateral',
+                  style: TextStyle(color: Colors.white, fontSize: 20),
+                ),
+              ),
+              if (isPremium) ...[
+                ListTile(
+                  leading: const Icon(Icons.chat),
+                  title: const Text('Chat Global'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (context) => const ChatPage()),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.people),
+                  title: const Text('Chat con usuarios'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.pushNamed(context, '/usuarios');
+                  },
+                ),
+              ] else ...[
+                ListTile(
+                  leading: const Icon(Icons.lock),
+                  title: const Text('Chat Global (Premium)'),
+                  subtitle: const Text(
+                    'Solo para usuarios con suscripción premium',
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          '⚠️ Funcionalidad disponible solo para usuarios premium',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.lock),
+                  title: const Text('Chat con usuarios (Premium)'),
+                  subtitle: const Text(
+                    'Solo para usuarios con suscripción premium',
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          '⚠️ Funcionalidad disponible solo para usuarios premium',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ],
+          );
+        },
       ),
     ),
     body: PersistentTabView(
@@ -129,8 +210,24 @@ class _HomePageState extends State<HomePage> {
 
 class WelcomeView extends StatelessWidget {
   final String role;
+  final String suscripcion;
 
-  const WelcomeView({super.key, required this.role});
+  const WelcomeView({super.key, required this.role, required this.suscripcion});
+  Future<List<Map<String, dynamic>>> _fetchEventos() async {
+    final filters = {'estado': 'activo'};
+
+    if (suscripcion != 'premium') {
+      filters['tipo_suscripcion'] = 'básico';
+    }
+
+    final data = await Supabase.instance.client
+        .from('eventos')
+        .select()
+        .match(filters)
+        .order('fecha', ascending: true);
+
+    return List<Map<String, dynamic>>.from(data);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -180,7 +277,7 @@ class WelcomeView extends StatelessWidget {
           // 🔘 Accesos rápidos
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: const [
+            children: [
               QuickAccessButton(
                 icon: Icons.phone_iphone,
                 label: "Responsive",
@@ -206,13 +303,113 @@ class WelcomeView extends StatelessWidget {
           ),
           const SizedBox(height: 10),
 
-          // 🧩 Cards de servicios
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: const [
-              ServiceCard(icon: Icons.android, label: "Android"),
-              ServiceCard(icon: Icons.web, label: "Joomla"),
-            ],
+          // 🧩 Cards de servicios + eventos
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: _fetchEventos(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final eventos = snapshot.data!;
+              if (eventos.isEmpty) {
+                return const Text("No hay eventos disponibles.");
+              }
+
+              return GridView.builder(
+                physics: const NeverScrollableScrollPhysics(),
+                shrinkWrap: true,
+                padding: const EdgeInsets.all(12),
+                itemCount: eventos.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.8,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                ),
+                itemBuilder: (context, index) {
+                  final evento = eventos[index];
+                  final fecha = DateTime.tryParse(evento['fecha'] ?? '');
+                  final fechaTexto = fecha != null
+                      ? DateFormat.yMMMd('es_ES').format(fecha)
+                      : 'Sin fecha';
+
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => EventDetailPage(evento: evento),
+                        ),
+                      );
+                    },
+                    child: Card(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      elevation: 5,
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (evento['imagen'] != null &&
+                              evento['imagen'].toString().isNotEmpty)
+                            Image.network(
+                              evento['imagen'],
+                              height: 120,
+                              fit: BoxFit.cover,
+                            )
+                          else
+                            Container(
+                              height: 120,
+                              color: Colors.teal.shade100,
+                              child: const Icon(
+                                Icons.event,
+                                size: 40,
+                                color: Colors.white,
+                              ),
+                            ),
+                          Padding(
+                            padding: const EdgeInsets.all(10.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  evento['titulo'] ?? 'Sin título',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.calendar_today,
+                                      size: 14,
+                                      color: Colors.teal,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        fechaTexto,
+                                        style: const TextStyle(fontSize: 12),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
           ),
         ],
       ),
@@ -226,11 +423,11 @@ class QuickAccessButton extends StatelessWidget {
   final Color color;
 
   const QuickAccessButton({
-    super.key,
+    Key? key,
     required this.icon,
     required this.label,
     required this.color,
-  });
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -243,42 +440,6 @@ class QuickAccessButton extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       onPressed: () {},
-    );
-  }
-}
-
-class ServiceCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const ServiceCard({super.key, required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        width: 130,
-        height: 150,
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 40, color: Colors.deepPurple),
-            const SizedBox(height: 12),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            const Text(
-              "Lorem ipsum dolor sit amet consectetur",
-              style: TextStyle(fontSize: 10),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

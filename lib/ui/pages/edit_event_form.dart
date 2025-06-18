@@ -21,7 +21,12 @@ class _EditEventFormState extends State<EditEventForm> {
   late TextEditingController _tituloController;
   late TextEditingController _descripcionController;
   late TextEditingController _imagenController;
+  late TextEditingController _duracionController;
+  late TextEditingController _lugarController;
+  late TextEditingController _ponentesController;
   late String _tipoSuscripcion;
+  late String _modalidad;
+  late String _estado;
   DateTime? _fechaSeleccionada;
   String? _imagenPreview;
 
@@ -37,7 +42,18 @@ class _EditEventFormState extends State<EditEventForm> {
     _imagenController = TextEditingController(
       text: widget.existingData['imagen'],
     );
+    _duracionController = TextEditingController(
+      text: widget.existingData['duracion'],
+    );
+    _lugarController = TextEditingController(
+      text: widget.existingData['lugar'],
+    );
+    _ponentesController = TextEditingController(
+      text: widget.existingData['ponentes'],
+    );
     _tipoSuscripcion = widget.existingData['tipo_suscripcion'] ?? 'básico';
+    _modalidad = widget.existingData['modalidad'] ?? 'presencial';
+    _estado = widget.existingData['estado'] ?? 'activo';
 
     final fechaStr = widget.existingData['fecha'];
     _fechaSeleccionada = fechaStr != null ? DateTime.tryParse(fechaStr) : null;
@@ -129,6 +145,37 @@ class _EditEventFormState extends State<EditEventForm> {
                 onChanged: (value) => setState(() => _tipoSuscripcion = value!),
                 decoration: const InputDecoration(labelText: 'Suscripción'),
               ),
+              TextFormField(
+                controller: _duracionController,
+                decoration: const InputDecoration(labelText: 'Duración'),
+                validator: (value) => value!.isEmpty ? 'Campo requerido' : null,
+              ),
+              DropdownButtonFormField<String>(
+                value: _modalidad,
+                decoration: const InputDecoration(labelText: 'Modalidad'),
+                items: ['presencial', 'virtual', 'híbrido']
+                    .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                    .toList(),
+                onChanged: (value) => setState(() => _modalidad = value!),
+              ),
+              TextFormField(
+                controller: _lugarController,
+                decoration: const InputDecoration(labelText: 'Lugar / Enlace'),
+                validator: (value) => value!.isEmpty ? 'Campo requerido' : null,
+              ),
+              TextFormField(
+                controller: _ponentesController,
+                decoration: const InputDecoration(labelText: 'Ponente(s)'),
+                validator: (value) => value!.isEmpty ? 'Campo requerido' : null,
+              ),
+              DropdownButtonFormField<String>(
+                value: _estado,
+                decoration: const InputDecoration(labelText: 'Estado'),
+                items: ['activo', 'cancelado', 'finalizado']
+                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                    .toList(),
+                onChanged: (value) => setState(() => _estado = value!),
+              ),
               const SizedBox(height: 10),
               Row(
                 children: [
@@ -146,21 +193,48 @@ class _EditEventFormState extends State<EditEventForm> {
                 label: const Text("Guardar cambios"),
                 onPressed: () async {
                   if (_formKey.currentState!.validate()) {
-                    await Supabase.instance.client
-                        .from('eventos')
-                        .update({
-                          'titulo': _tituloController.text.trim(),
-                          'descripcion': _descripcionController.text.trim(),
-                          'imagen': _imagenController.text.trim(),
-                          'tipo_suscripcion': _tipoSuscripcion,
-                          'fecha': _fechaSeleccionada?.toIso8601String(),
-                        })
-                        .eq('id', widget.eventId);
+                    try {
+                      final response = await Supabase.instance.client
+                          .from('eventos')
+                          .update({
+                            'titulo': _tituloController.text.trim(),
+                            'descripcion': _descripcionController.text.trim(),
+                            'imagen': _imagenController.text.trim(),
+                            'tipo_suscripcion': _tipoSuscripcion,
+                            'fecha': _fechaSeleccionada?.toIso8601String(),
+                            'duracion': _duracionController.text.trim(),
+                            'modalidad': _modalidad,
+                            'lugar': _lugarController.text.trim(),
+                            'ponentes': _ponentesController.text.trim(),
+                            'estado': _estado,
+                          })
+                          .eq('id', widget.eventId)
+                          .select(); // Para forzar retorno de datos y evitar silencios
 
-                    if (mounted) Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Evento actualizado")),
-                    );
+                      if (response.isEmpty) {
+                        throw Exception(
+                          "No se encontró el evento para actualizar.",
+                        );
+                      }
+
+                      if (mounted) {
+                        Navigator.pop(context); // Cierra el modal
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("✅ Evento actualizado exitosamente"),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      debugPrint("❌ Error al actualizar evento: $e");
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text("Error al actualizar evento: $e"),
+                          ),
+                        );
+                      }
+                    }
                   }
                 },
               ),
