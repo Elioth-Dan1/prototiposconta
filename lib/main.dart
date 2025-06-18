@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:firebase_core/firebase_core.dart';
+import 'core/services/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -109,6 +110,7 @@ class AuthGate extends StatelessWidget {
               }
 
               if (userSnapshot.hasData) {
+                NotificationService.init();
                 return HomePage(
                   role: userSnapshot.data!['role']!,
                   suscripcion: userSnapshot.data!['suscripcion']!,

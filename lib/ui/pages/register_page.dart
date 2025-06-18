@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -35,21 +37,23 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
+  /* ───────────────────────── Registro ───────────────────────── */
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
     try {
+      /* 1. Crear usuario en Firebase Auth */
       final userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
-            email: _emailController.text.trim(),
-            password: _passwordController.text.trim(),
-          );
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
 
       final userId = userCredential.user!.uid;
 
+      /* 2. Parsear fecha de nacimiento */
       final fechaNacStr = _fechaNacimientoController.text.trim();
       final fechaNacimiento = DateTime.tryParse(fechaNacStr);
-
       if (fechaNacimiento == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Fecha de nacimiento inválida')),
@@ -57,71 +61,63 @@ class _RegisterPageState extends State<RegisterPage> {
         return;
       }
 
-      // Datos para Firestore
-      final firestoreData = {
+      /* 3. Obtener token FCM (puede tardar) */
+      String? fcmToken;
+      try {
+        await FirebaseMessaging.instance.requestPermission();
+        fcmToken = await FirebaseMessaging.instance.getToken();
+      } catch (_) {
+        // Si falla, lo dejamos nulo y lo solicitaremos luego en el Login
+        fcmToken = null;
+      }
+
+      /* 4. Datos comunes */
+      final nowIso = DateTime.now().toIso8601String();
+      final baseData = {
         'nombres': _nameController.text.trim(),
         'apellido_paterno': _apellidoPaternoController.text.trim(),
         'apellido_materno': _apellidoMaternoController.text.trim(),
         'telefono': _telefonoController.text.trim(),
-        'fecha_nacimiento': fechaNacStr,
+        'fecha_nacimiento': fechaNacimiento.toIso8601String(),
         'email': _emailController.text.trim(),
         'rol': 'usuario',
         'suscripcion': 'basico',
-        'created_at': FieldValue.serverTimestamp(),
+        'fcm_token': fcmToken,
       };
 
-      // Guardar en Firebase Firestore
+      /* 5. Guardar en Firebase Firestore */
       await FirebaseFirestore.instance
           .collection('usuarios')
           .doc(userId)
-          .set(firestoreData);
+          .set({...baseData, 'created_at': FieldValue.serverTimestamp()});
 
-      // Datos para Supabase
-      final supabaseData = {
+      /* 6. Guardar en Supabase */
+      await Supabase.instance.client.from('usuarios').insert({
         'id': userId,
-        'nombres': firestoreData['nombres'],
-        'apellido_paterno': firestoreData['apellido_paterno'],
-        'apellido_materno': firestoreData['apellido_materno'],
-        'telefono': firestoreData['telefono'],
-        'fecha_nacimiento': fechaNacimiento.toIso8601String(),
-        'email': firestoreData['email'],
-        'rol': 'usuario',
-        'suscripcion': 'basico',
-        'created_at': DateTime.now().toIso8601String(),
-      };
-
-      // Insertar en Supabase
-      final response = await Supabase.instance.client
-          .from('usuarios')
-          .insert(supabaseData)
-          .select(); // obligatorio para recibir el resultado
-
-      if (response == null || response.isEmpty) {
-        debugPrint("❌ No se insertó en Supabase");
-      } else {
-        debugPrint("✅ Usuario registrado en Supabase: $response");
-      }
+        ...baseData,
+        'created_at': nowIso,
+      });
 
       if (!mounted) return;
 
-      // Mostrar mensaje
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Registro exitoso')));
-
-      // Esperar 3 segundos antes de redirigir
-      await Future.delayed(const Duration(seconds: 4));
-
-      // Verifica que el widget siga montado antes de navegar
-      if (!mounted) return;
-      Navigator.pop(context);
+      /* 7. Mensaje de éxito y volver */
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Registro exitoso')),
+      );
+      await Future.delayed(const Duration(seconds: 3));
+      if (mounted) Navigator.pop(context);
     } on FirebaseAuthException catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: ${e.message}')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.message}')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error inesperado: $e')),
+      );
     }
   }
 
+  /* ──────────────────────── UI (Formulario) ─────────────────────── */
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -133,66 +129,20 @@ class _RegisterPageState extends State<RegisterPage> {
           child: SingleChildScrollView(
             child: Column(
               children: [
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(labelText: 'Nombres'),
-                  validator: (value) =>
-                      value!.isEmpty ? 'Campo obligatorio' : null,
-                ),
-                TextFormField(
-                  controller: _apellidoPaternoController,
-                  decoration: const InputDecoration(
-                    labelText: 'Apellido paterno',
-                  ),
-                  validator: (value) =>
-                      value!.isEmpty ? 'Campo obligatorio' : null,
-                ),
-                TextFormField(
-                  controller: _apellidoMaternoController,
-                  decoration: const InputDecoration(
-                    labelText: 'Apellido materno',
-                  ),
-                ),
-                TextFormField(
-                  controller: _telefonoController,
-                  decoration: const InputDecoration(labelText: 'Teléfono'),
-                  keyboardType: TextInputType.phone,
-                ),
-                TextFormField(
-                  controller: _fechaNacimientoController,
-                  decoration: const InputDecoration(
-                    labelText: 'Fecha de nacimiento (YYYY-MM-DD)',
-                  ),
-                  validator: (value) =>
-                      value!.isEmpty ? 'Campo obligatorio' : null,
-                ),
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Correo electrónico',
-                  ),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) =>
-                      value!.isEmpty ? 'Campo obligatorio' : null,
-                ),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Contraseña'),
-                  validator: (value) =>
-                      value!.length < 6 ? 'Mínimo 6 caracteres' : null,
-                ),
-                TextFormField(
-                  controller: _confirmPasswordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Confirmar contraseña',
-                  ),
-                  validator: (value) => value != _passwordController.text
-                      ? 'Las contraseñas no coinciden'
-                      : null,
-                ),
-                const SizedBox(height: 20),
+                _buildText(_nameController, 'Nombres'),
+                _buildText(_apellidoPaternoController, 'Apellido paterno'),
+                _buildText(_apellidoMaternoController, 'Apellido materno'),
+                _buildText(_telefonoController, 'Teléfono',
+                    keyboard: TextInputType.phone, required: false),
+                _buildText(_fechaNacimientoController,
+                    'Fecha de nacimiento (YYYY-MM-DD)'),
+                _buildText(_emailController, 'Correo electrónico',
+                    keyboard: TextInputType.emailAddress),
+                _buildText(_passwordController, 'Contraseña',
+                    obscure: true, minLen: 6),
+                _buildText(_confirmPasswordController, 'Confirmar contraseña',
+                    obscure: true, confirm: _passwordController),
+                const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: _register,
                   child: const Text('Registrar'),
@@ -202,6 +152,35 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         ),
       ),
+    );
+  }
+
+  /* ───────────── Helper para input con validaciones simples ───────────── */
+  Widget _buildText(
+    TextEditingController controller,
+    String label, {
+    bool obscure = false,
+    int minLen = 1,
+    TextInputType keyboard = TextInputType.text,
+    bool required = true,
+    TextEditingController? confirm,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscure,
+      keyboardType: keyboard,
+      decoration: InputDecoration(labelText: label),
+      validator: (value) {
+        final v = value?.trim() ?? '';
+        if (required && v.isEmpty) return 'Campo obligatorio';
+        if (minLen > 1 && v.length < minLen) {
+          return 'Mínimo $minLen caracteres';
+        }
+        if (confirm != null && v != confirm.text.trim()) {
+          return 'Las contraseñas no coinciden';
+        }
+        return null;
+      },
     );
   }
 }
