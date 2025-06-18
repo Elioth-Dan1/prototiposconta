@@ -49,4 +49,22 @@ class NotificationService {
       }
     });
   }
+
+    static Future<void> clearToken() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      try {
+        // 1. Pide a FCM que invalide el token en este dispositivo
+        await FirebaseMessaging.instance.deleteToken();
+
+        // 2. Limpia el campo en Supabase (si usas 'fcm_token' en la tabla usuarios)
+        await Supabase.instance.client
+            .from('usuarios')
+            .update({'fcm_token': null})
+            .eq('id', uid);
+      } catch (e) {
+        debugPrint('Error limpiando token FCM: $e');
+      }
+    }
+  }
 }

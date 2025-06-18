@@ -1,5 +1,6 @@
 // ignore_for_file: avoid_redundant_argument_values
 
+import 'package:app_flutter/core/services/notification_service.dart';
 import 'package:app_flutter/ui/pages/activity_log_page.dart';
 import 'package:app_flutter/ui/pages/admin_panel_page.dart';
 import 'package:app_flutter/ui/pages/chat_page.dart';
@@ -7,6 +8,7 @@ import 'package:app_flutter/ui/pages/days_counter_page.dart';
 import 'package:app_flutter/ui/pages/event_detail_page.dart';
 import 'package:app_flutter/ui/pages/premium_upgrade_page.dart';
 import 'package:app_flutter/ui/pages/user_profile_page.dart';
+import 'package:app_flutter/ui/pages/mood_tracker_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import "package:flutter/material.dart";
 import 'package:intl/intl.dart';
@@ -96,6 +98,7 @@ class _HomePageState extends State<HomePage> {
           icon: const Icon(Icons.logout),
           tooltip: 'Cerrar sesión',
           onPressed: () async {
+            await NotificationService.clearToken();
             await FirebaseAuth.instance.signOut();
             if (context.mounted) {
               ScaffoldMessenger.of(
@@ -181,6 +184,18 @@ class _HomePageState extends State<HomePage> {
                         content: Text(
                           '⚠️ Funcionalidad disponible solo para usuarios premium',
                         ),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.emoji_emotions),
+                  title: const Text('Mi estado de ánimo'),
+                  onTap: () {
+                    Navigator.of(context).pop(); // cierra drawer
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const MoodTrackerPage(),
                       ),
                     );
                   },
