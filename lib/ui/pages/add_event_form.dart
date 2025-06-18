@@ -15,6 +15,12 @@ class _AddEventFormState extends State<AddEventForm> {
   final _tituloController = TextEditingController();
   final _descripcionController = TextEditingController();
   final _imagenController = TextEditingController();
+  final _duracionController = TextEditingController();
+  final _lugarController = TextEditingController();
+  final _ponentesController = TextEditingController();
+
+  String _modalidad = 'presencial';
+  String _estado = 'activo';
   String _tipoSuscripcion = 'básico';
   DateTime? _fechaSeleccionada;
   String? _imagenPreview;
@@ -58,6 +64,11 @@ class _AddEventFormState extends State<AddEventForm> {
       'tipo_suscripcion': _tipoSuscripcion,
       'fecha': _fechaSeleccionada!.toIso8601String(),
       'usuario_id': user.uid,
+      'duracion': _duracionController.text.trim(),
+      'modalidad': _modalidad,
+      'lugar': _lugarController.text.trim(),
+      'ponentes': _ponentesController.text.trim(),
+      'estado': _estado,
     };
 
     final response = await Supabase.instance.client
@@ -158,6 +169,43 @@ class _AddEventFormState extends State<AddEventForm> {
                   ),
                 ],
               ),
+              TextFormField(
+                controller: _duracionController,
+                decoration: const InputDecoration(
+                  labelText: 'Duración (Ej: 2 horas)',
+                ),
+                validator: (value) => value!.isEmpty ? 'Campo requerido' : null,
+              ),
+
+              DropdownButtonFormField<String>(
+                value: _modalidad,
+                decoration: const InputDecoration(labelText: 'Modalidad'),
+                items: ['presencial', 'virtual', 'híbrido']
+                    .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                    .toList(),
+                onChanged: (value) => setState(() => _modalidad = value!),
+              ),
+
+              TextFormField(
+                controller: _lugarController,
+                decoration: const InputDecoration(labelText: 'Lugar o enlace'),
+                validator: (value) => value!.isEmpty ? 'Campo requerido' : null,
+              ),
+
+              TextFormField(
+                controller: _ponentesController,
+                decoration: const InputDecoration(labelText: 'Ponente(s)'),
+                validator: (value) => value!.isEmpty ? 'Campo requerido' : null,
+              ),
+
+              DropdownButtonFormField<String>(
+                value: _estado,
+                decoration: const InputDecoration(labelText: 'Estado'),
+                items: ['activo', 'cancelado', 'finalizado']
+                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                    .toList(),
+                onChanged: (value) => setState(() => _estado = value!),
+              ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
                 icon: const Icon(Icons.save),
@@ -169,5 +217,16 @@ class _AddEventFormState extends State<AddEventForm> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _tituloController.dispose();
+    _descripcionController.dispose();
+    _imagenController.dispose();
+    _duracionController.dispose();
+    _lugarController.dispose();
+    _ponentesController.dispose();
+    super.dispose();
   }
 }
