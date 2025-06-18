@@ -1,3 +1,5 @@
+import 'package:app_flutter/ui/pages/private_chat_page.dart';
+import 'package:app_flutter/ui/pages/user_list_page.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -79,6 +81,20 @@ class MyApp extends StatelessWidget {
       ],
       supportedLocales: const [Locale('es', 'ES')],
       home: const AuthGate(),
+
+      routes: {
+        '/chat': (context) {
+          final args =
+              ModalRoute.of(context)!.settings.arguments
+                  as Map<String, dynamic>;
+          return PrivateChatPage(
+            chatId: args['chatId'],
+            receiverId: args['receiverId'],
+            receiverName: args['receiverName'],
+          );
+        },
+        '/usuarios': (_) => const UsersListPage(),
+      },
     );
   }
 }

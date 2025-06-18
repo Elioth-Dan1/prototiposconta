@@ -2,12 +2,14 @@
 
 import 'package:app_flutter/ui/pages/activity_log_page.dart';
 import 'package:app_flutter/ui/pages/admin_panel_page.dart';
+import 'package:app_flutter/ui/pages/chat_page.dart';
 import 'package:app_flutter/ui/pages/days_counter_page.dart';
 import 'package:app_flutter/ui/pages/premium_upgrade_page.dart';
 import 'package:app_flutter/ui/pages/user_profile_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import "package:flutter/material.dart";
 import "package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart";
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class HomePage extends StatefulWidget {
   final String role;
@@ -102,12 +104,91 @@ class _HomePageState extends State<HomePage> {
         ),
       ],
     ),
-    drawer: const Drawer(
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[Text("Este es el menú lateral")],
-        ),
+    drawer: Drawer(
+      child: FutureBuilder<Map<String, dynamic>?>(
+        future: Supabase.instance.client
+            .from('usuarios')
+            .select('suscripcion')
+            .eq('id', FirebaseAuth.instance.currentUser!.uid)
+            .maybeSingle(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final data = snapshot.data;
+          final isPremium = data?['suscripcion'] == 'premium';
+
+          return ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              const DrawerHeader(
+                decoration: BoxDecoration(color: Colors.teal),
+                child: Text(
+                  'Menú Lateral',
+                  style: TextStyle(color: Colors.white, fontSize: 20),
+                ),
+              ),
+
+              // ✅ Chat global y privado solo para premium
+              if (isPremium) ...[
+                ListTile(
+                  leading: const Icon(Icons.chat),
+                  title: const Text('Chat Global'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (context) => const ChatPage()),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.people),
+                  title: const Text('Chat con usuarios'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.pushNamed(context, '/usuarios');
+                  },
+                ),
+              ] else ...[
+                ListTile(
+                  leading: const Icon(Icons.lock),
+                  title: const Text('Chat Global (Premium)'),
+                  subtitle: const Text(
+                    'Solo para usuarios con suscripción premium',
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          '⚠️ Funcionalidad disponible solo para usuarios premium',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.lock),
+                  title: const Text('Chat con usuarios (Premium)'),
+                  subtitle: const Text(
+                    'Solo para usuarios con suscripción premium',
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          '⚠️ Funcionalidad disponible solo para usuarios premium',
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ],
+          );
+        },
       ),
     ),
     body: PersistentTabView(
