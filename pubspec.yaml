@@ -56,11 +56,17 @@ dependencies:
   table_calendar: ^3.2.0
   firebase_messaging: ^14.7.11
   flutter_local_notifications: ^17.1.2
+  animate_do: ^3.0.2
+  
+
+
+  
   
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.13.1
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -68,6 +74,11 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/app_icon.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -84,6 +95,8 @@ flutter:
     - assets/login.jpg
     - assets/suscrip.jpg
     - assets/mastercard.png
+    - assets/app_icon.png
+    - assets/qryape.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

@@ -1,14 +1,14 @@
-// ignore_for_file: avoid_redundant_argument_values
-
 import 'package:app_flutter/core/services/notification_service.dart';
 import 'package:app_flutter/ui/pages/activity_log_page.dart';
 import 'package:app_flutter/ui/pages/admin_panel_page.dart';
+import 'package:app_flutter/ui/pages/admin_payment_validation.dart';
+import 'package:app_flutter/ui/pages/admin_users_page.dart';
 import 'package:app_flutter/ui/pages/chat_page.dart';
 import 'package:app_flutter/ui/pages/days_counter_page.dart';
 import 'package:app_flutter/ui/pages/event_detail_page.dart';
+import 'package:app_flutter/ui/pages/mood_tracker_page.dart';
 import 'package:app_flutter/ui/pages/premium_upgrade_page.dart';
 import 'package:app_flutter/ui/pages/user_profile_page.dart';
-import 'package:app_flutter/ui/pages/mood_tracker_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import "package:flutter/material.dart";
 import 'package:intl/intl.dart';
@@ -134,6 +134,31 @@ class _HomePageState extends State<HomePage> {
                   style: TextStyle(color: Colors.white, fontSize: 20),
                 ),
               ),
+              if (widget.role == 'admin') ...[
+                ListTile(
+                  leading: const Icon(Icons.supervised_user_circle),
+                  title: const Text('Gestionar usuarios'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const AdminUsersPage()),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.payment),
+                  title: const Text('Pagos pendientes'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const AdminPendingPaymentsPage(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+
               if (isPremium) ...[
                 ListTile(
                   leading: const Icon(Icons.chat),
@@ -147,7 +172,7 @@ class _HomePageState extends State<HomePage> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.people),
-                  title: const Text('Chat con usuarios'),
+                  title: const Text('Asesoria'),
                   onTap: () {
                     Navigator.of(context).pop();
                     Navigator.pushNamed(context, '/usuarios');
@@ -188,19 +213,17 @@ class _HomePageState extends State<HomePage> {
                     );
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.emoji_emotions),
-                  title: const Text('Mi estado de ánimo'),
-                  onTap: () {
-                    Navigator.of(context).pop(); // cierra drawer
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const MoodTrackerPage(),
-                      ),
-                    );
-                  },
-                ),
               ],
+              ListTile(
+                leading: const Icon(Icons.emoji_emotions),
+                title: const Text('Mi estado de ánimo'),
+                onTap: () {
+                  Navigator.of(context).pop(); // cierra drawer
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const MoodTrackerPage()),
+                  );
+                },
+              ),
             ],
           );
         },
@@ -254,55 +277,12 @@ class WelcomeView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 🖼️ Banner superior
-          Container(
-            width: double.infinity,
-            height: 180,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              gradient: const LinearGradient(
-                colors: [Colors.purple, Colors.blue],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "Mobile Design Template",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    "Find your need now and get Discount",
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
           const SizedBox(height: 20),
 
           // 🔘 Accesos rápidos
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              QuickAccessButton(
-                icon: Icons.phone_iphone,
-                label: "Responsive",
-                color: Colors.pinkAccent,
-              ),
-              QuickAccessButton(
-                icon: Icons.lightbulb,
-                label: "Fresh Idea",
-                color: Colors.blueAccent,
-              ),
               QuickAccessButton(
                 icon: Icons.support_agent,
                 label: "Support",
@@ -313,7 +293,7 @@ class WelcomeView extends StatelessWidget {
 
           const SizedBox(height: 30),
           const Text(
-            "Services",
+            "Eventos",
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 10),

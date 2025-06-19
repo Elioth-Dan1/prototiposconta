@@ -1,3 +1,4 @@
+// archivo: login_page.dart
 import 'package:app_flutter/ui/pages/home_page.dart';
 import 'package:app_flutter/ui/pages/register_page.dart';
 import 'package:app_flutter/ui/pages/remember_password.dart';
@@ -37,7 +38,6 @@ class _LoginPageState extends State<LoginPage> {
       final rol = data['rol'] ?? 'usuario';
       final suscripcion = data['suscripcion'] ?? 'basico';
 
-      // Sincronizar en Supabase
       final existing = await Supabase.instance.client
           .from('usuarios')
           .select()
@@ -76,7 +76,7 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text("Error: ${e.message}")));
+      ).showSnackBar(SnackBar(content: Text("Error: \${e.message}")));
     }
   }
 
@@ -123,7 +123,6 @@ class _LoginPageState extends State<LoginPage> {
     final rol = data['rol'] ?? 'usuario';
     final suscripcion = data['suscripcion'] ?? 'basico';
 
-    // Supabase
     final existing = await Supabase.instance.client
         .from('usuarios')
         .select()
@@ -163,84 +162,168 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            Image.asset("assets/login.jpg", width: 150, height: 150),
-            const SizedBox(height: 16),
-            const Text(
-              "Bienvenido a mi aplicación",
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height - 32,
             ),
-            const SizedBox(height: 24),
-            TextFormField(
-              controller: _emailController,
-              decoration: const InputDecoration(
-                labelText: 'Correo electrónico',
-                border: OutlineInputBorder(),
+            child: IntrinsicHeight(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 40),
+                  Center(child: Image.asset("assets/app_icon.png", width: 80)),
+                  const SizedBox(height: 20),
+                  const Text(
+                    "Bienvenido a la comunidad",
+                    style: TextStyle(
+                      fontSize: 24,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    "Inicia sesión o regístrate para continuar",
+                    style: TextStyle(color: Colors.white70),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Email
+                  TextField(
+                    controller: _emailController,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Correo electrónico',
+                      labelStyle: const TextStyle(color: Colors.white70),
+                      filled: true,
+                      fillColor: Colors.grey[850],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Password
+                  TextField(
+                    controller: _passwordController,
+                    style: const TextStyle(color: Colors.white),
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: 'Contraseña',
+                      labelStyle: const TextStyle(color: Colors.white70),
+                      filled: true,
+                      fillColor: Colors.grey[850],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      child: const Text(
+                        "¿Olvidaste tu contraseña?",
+                        style: TextStyle(
+                          color: Colors.amber,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => RememberPassword()),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Botón Iniciar Sesión
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.amber,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      onPressed: _loginWithEmail,
+                      child: const Text(
+                        "Iniciar sesión",
+                        style: TextStyle(color: Colors.black),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    "o inicia con",
+                    style: TextStyle(color: Colors.white60),
+                  ),
+                  const SizedBox(height: 16),
+
+                  SocialLoginButton(
+                    buttonType: SocialLoginButtonType.google,
+                    onPressed: _loginWithGoogle,
+                  ),
+
+                  const SizedBox(height: 24),
+                  GestureDetector(
+                    child: const Text(
+                      "Crear cuenta",
+                      style: TextStyle(
+                        color: Colors.white,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const RegisterPage()),
+                      );
+                    },
+                  ),
+
+                  const Spacer(),
+                  const SizedBox(height: 30),
+                  const Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: "Al continuar, aceptas los ",
+                          style: TextStyle(color: Colors.white54, fontSize: 12),
+                        ),
+                        TextSpan(
+                          text: "términos de servicio",
+                          style: TextStyle(color: Colors.amber, fontSize: 12),
+                        ),
+                        TextSpan(
+                          text: " y has leído la ",
+                          style: TextStyle(color: Colors.white54, fontSize: 12),
+                        ),
+                        TextSpan(
+                          text: "política de privacidad",
+                          style: TextStyle(color: Colors.amber, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
-              keyboardType: TextInputType.emailAddress,
             ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _passwordController,
-              decoration: const InputDecoration(
-                labelText: 'Contraseña',
-                border: OutlineInputBorder(),
-              ),
-              obscureText: true,
-            ),
-            const SizedBox(height: 10),
-            GestureDetector(
-              child: Text(
-                "Olvidé mi contraseña",
-                style: TextStyle(
-                  color: Colors.blue[700],
-                  decoration: TextDecoration.underline,
-                ),
-              ),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => RememberPassword()),
-                );
-              },
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _loginWithEmail,
-                child: const Text("Iniciar sesión"),
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text("o inicia con"),
-            const SizedBox(height: 16),
-            SocialLoginButton(
-              buttonType: SocialLoginButtonType.google,
-              onPressed: _loginWithGoogle,
-            ),
-            const SizedBox(height: 16),
-            GestureDetector(
-              child: Text(
-                "Crear cuenta",
-                style: TextStyle(
-                  color: Colors.blue[700],
-                  decoration: TextDecoration.underline,
-                ),
-              ),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const RegisterPage()),
-                );
-              },
-            ),
-          ],
+          ),
         ),
       ),
     );
